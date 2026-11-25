@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WorkVia Table – Interactive Demo</title>
+<style>
+:root{--bg:#f3efe8;--panel:#fffdf9;--text:#2a2622;--muted:#6f675d;--line:#ddd5c8;--accent:#a8662f;--good:#2e9b5a;--bad:#d0443a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1a18;--panel:#272320;--text:#f1ece5;--muted:#a79e92;--line:#3b3631}}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+#c{flex:1;position:relative;min-height:0;touch-action:none}
+canvas{display:block}
+.lbl{position:absolute;pointer-events:none;font-size:11px;background:var(--panel);color:var(--text);border:1px solid var(--line);padding:2px 7px;border-radius:99px;transform:translate(-50%,-130%);white-space:nowrap;display:none}
+#top{position:absolute;left:12px;top:10px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none}
+#top>*{pointer-events:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+#meter{min-width:170px}
+#bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;margin:6px 0}
+#fill{height:100%;width:0;background:var(--bad);transition:background .2s}
+#chips{display:flex;flex-wrap:wrap;gap:5px;font-size:12px}
+.chip{padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.chip.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+#panel{background:var(--panel);border-top:1px solid var(--line);padding:12px 16px}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;max-width:900px;margin:0 auto}
+.sl{flex:1;min-width:220px}
+.sl label{display:flex;justify-content:space-between;font-size:14px;font-weight:600}
+input[type=range]{width:100%;height:34px;accent-color:var(--accent)}
+input[type=range]:disabled{opacity:.35}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-size:14px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#hint{text-align:center;font-size:12px;color:var(--muted);margin-top:4px}
+#left{display:flex;flex-direction:column;align-items:flex-start}
+#legend{margin-top:8px;padding:8px 12px}
+#meter{margin-left:auto;max-width:190px}
+.bd,.li .n{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.bd{position:absolute;transform:translate(-50%,-50%);pointer-events:none;border:2px solid var(--panel);display:none}
+.li{display:flex;gap:8px;align-items:center;font-size:12px;margin:4px 0}
+.li .n{width:18px;height:18px;font-size:11px}
+#left{display:none}
+</style>
+</head>
+<body>
+<div id="c">
+  <div id="top">
+    <div id="left"><button id="tg" class="on">Hide features</button><div id="legend" class="card"></div></div>
+    <div class="card" id="meter">
+      <div style="font-size:12px;color:var(--muted)">Comfort level</div>
+      <div style="font-size:26px;font-weight:700" id="pct">0%</div>
+      <div id="bar"><div id="fill"></div></div>
+      <div id="cap" style="font-size:12px;margin:2px 0 6px;color:var(--muted)"></div><div id="chips"><span class="chip" id="cNeck">Neck</span><span class="chip" id="cBack">Back</span><span class="chip" id="cLegs">Legs</span></div>
+    </div>
+  </div>
+</div>
+<div id="panel">
+  <div class="row">
+    <div class="btns">
+      <button id="bBad" class="on">Typical table</button>
+      <button id="bOur">WorkVia Table</button>
+    </div>
+    <div class="sl"><label><span>Height</span><span id="vH"></span></label><input type="range" id="sH" min="26" max="60" value="30"></div>
+    <div class="sl"><label><span>Tilt angle</span><span id="vT"></span></label><input type="range" id="sT" min="0" max="30" value="0"></div>
+  </div>
+  <div id="hint">Drag the scene to rotate · pinch or scroll to zoom</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const box=document.getElementById('c');
+const scene=new THREE.Scene();
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+scene.background=new THREE.Color(dark?0x1c1a18:0xf3efe8);
+const cam=new THREE.PerspectiveCamera(40,1,.05,50);cam.position.set(.8,1,2);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));box.appendChild(ren.domElement);
+const ctl=new THREE.OrbitControls(cam,ren.domElement);ctl.target.set(-.15,.3,0);ctl.enableDamping=true;ctl.maxPolarAngle=1.5;ctl.minDistance=.8;ctl.maxDistance=4;
+scene.add(new THREE.HemisphereLight(0xffffff,0x887766,.8));
+const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(2,3,2);scene.add(sun);
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.7},o));
+const B=(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+const CY=(r,h,m,s=20)=>new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,s),m);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const UP=V(0,1,0);
+function seg(m,a,b){const d=b.clone().sub(a);m.position.copy(a).add(b).multiplyScalar(.5);m.scale.y=d.length();m.quaternion.setFromUnitVectors(UP,d.normalize());}
+function tube(pts,r,col){return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*4,r,6,false),M(col));}
+function wig(pts,n,amp){const c=new THREE.CatmullRomCurve3(pts),o=[];for(let i=0;i<=n;i++){const t=i/n,p=c.getPoint(t),w=Math.sin(Math.PI*t);o.push(V(p.x+Math.sin(t*37)*amp*w,p.y,p.z+Math.cos(t*29)*amp*w));}return o;}
+const G=(p)=>{const g=new THREE.Group();p.add(g);return g;};
+
+// room + bed
+const floor=B(6,.02,4,M(dark?0x2b2724:0xe4ddd1));floor.position.y=-.27;scene.add(floor);
+const bed=B(2.4,.22,1.2,M(0x7b6a58));bed.position.set(.1,-.14,0);scene.add(bed);
+const mat=B(2.3,.1,1.1,M(0xd9d4cc));mat.position.set(.1,-.05,0);scene.add(mat);
+const hb=B(.08,.9,1.2,M(0x5b4a3a));hb.position.set(-1.1,.2,0);scene.add(hb);
+const pil=B(.3,.5,.6,M(0xf2efe9));pil.position.set(-.68,.19,0);pil.rotation.z=.6;scene.add(pil);
+const sock=B(.02,.08,.07,M(0xffffff));sock.position.set(-1.05,.35,.5);scene.add(sock);
+
+// person (resting back against the pillow)
+const OX=-.3;
+const skin=M(0xe0b48f),shirt=M(0x4a6fa5),pants=M(0x3b3f4a);
+const torso=CY(.115,1,shirt);torso.scale.z=1.5;scene.add(torso);
+const hip=new THREE.Mesh(new THREE.SphereGeometry(.12,16,12),pants);hip.scale.z=1.4;hip.position.set(OX,.11,0);scene.add(hip);
+const neck=CY(.04,1,skin);scene.add(neck);
+const hd=new THREE.Mesh(new THREE.SphereGeometry(.1,20,16),skin);scene.add(hd);
+const eye=new THREE.Mesh(new THREE.SphereGeometry(.015,8,8),M(0x222222));scene.add(eye);
+const limb=(r,m)=>{const a=CY(r,1,m,14);scene.add(a);return a;};
+const thigh=[limb(.075,pants),limb(.075,pants)],shin=[limb(.06,pants),limb(.06,pants)];
+const uarm=[limb(.04,shirt),limb(.04,shirt)],farm=[limb(.035,skin),limb(.035,skin)];
+const hipP=V(OX,.11,0),knee=V(.42+OX,.26,0),foot=V(.82+OX,.07,0);
+[-1,1].forEach((s,i)=>{seg(thigh[i],V(OX,.11,s*.1),V(knee.x,knee.y,s*.1));seg(shin[i],V(knee.x,knee.y,s*.1),V(foot.x,foot.y,s*.1));
+ const ft=B(.14,.06,.07,M(0xeeeeee));ft.position.set(foot.x+.04,.04,s*.1);scene.add(ft);});
+function pain(){const s=new THREE.Mesh(new THREE.SphereGeometry(.07,12,10),new THREE.MeshBasicMaterial({color:0xff2a1f,transparent:true,opacity:0,depthTest:false}));s.renderOrder=9;scene.add(s);return s;}
+const pNeck=pain(),pBack=pain(),pKnee=pain();
+
+// table
+const T=new THREE.Group();T.position.x=.38+OX;scene.add(T);
+const black=M(0x1f1f1f,{roughness:.55}),grey=M(0x8c8c8c),wood=M(0x8a5a2e,{roughness:.5}),plain=M(0xc9b790),copper=M(0xb87b4b,{metalness:.7,roughness:.3});
+const oT=G(T),tT=G(T);               // legs: ours (T-shaped) / typical (folding)
+const white=M(0xf2f2f2);
+const cols=[],hk=[];
+[-1,1].forEach(s=>{
+ const f=B(.4,.02,.05,black);f.position.set(0,.01,s*.3);oT.add(f);if(s>0)oT.foot=f;
+ const c=CY(.025,1,black);c.position.set(0,0,s*.3);T.add(c);cols.push(c);
+ const k=CY(.02,.022,copper,24);k.rotation.x=Math.PI/2;oT.add(k);hk.push([k,s]);
+ const post=CY(.014,.23,white);post.position.set(.2,.135,s*.31);tT.add(post);
+ const pc=CY(.016,.02,black);pc.position.set(.2,.02,s*.31);tT.add(pc);
+ const bl=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-.2,.25,s*.31),V(-.2,.1,s*.31),V(-.17,.04,s*.31),V(-.1,.016,s*.31),V(0,.012,s*.31)]),30,.013,8,false),white);tT.add(bl);if(s>0)tT.leg=bl;
+ const tip=new THREE.Mesh(new THREE.SphereGeometry(.02,10,8),black);tip.position.set(-.17,.04,s*.31);tT.add(tip);
+});
+const tp=new THREE.Group();T.add(tp);
+const oP=G(tp),tP=G(tp);              // top items: ours / typical
+const body=B(.5,.05,.74,wood);tp.add(body);
+const leather=B(.48,.01,.72,black);leather.position.y=.028;oP.add(leather);
+const lapB=B(.22,.012,.32,M(0x9a9a9a,{metalness:.6,roughness:.4}));lapB.position.set(-.02,.039,0);tp.add(lapB);
+const scr=B(.006,.2,.32,M(0x2b2f36));scr.position.set(.09,.14,0);scr.rotation.z=-.3;tp.add(scr);
+const glow=B(.002,.17,.29,new THREE.MeshBasicMaterial({color:0x6aa0d8}));glow.position.x=-.004;scr.add(glow);
+// ours: bottle stand, phone stand, USB hub, drawer, angle knobs
+const cup=CY(.034,.004,M(0x050505),24);cup.position.set(.16,.036,.28);oP.add(cup);
+const rim=new THREE.Mesh(new THREE.TorusGeometry(.036,.004,8,28),copper);rim.rotation.x=Math.PI/2;rim.position.set(.16,.036,.28);oP.add(rim);
+const holder=CY(.042,.07,black,24);holder.position.set(.16,-.04,.28);oP.add(holder);
+const arm=B(.02,.12,.03,wood);arm.position.set(.17,.09,-.28);arm.rotation.z=-.3;oP.add(arm);
+const ph=B(.012,.13,.065,M(0x222222));ph.position.set(.2,.16,-.28);ph.rotation.z=-.3;oP.add(ph);
+const usb=B(.14,.02,.004,M(0xbdbdbd,{metalness:.6}));usb.position.set(-.108,-.003,.372);oP.add(usb);
+const ports=[0,1,2,3].map(i=>{const p=B(.02,.008,.006,M(0x111111));p.position.set(-.16+i*.035,-.003,.374);oP.add(p);return p;});
+const drw=B(.016,.036,.2,wood);drw.position.set(-.308,-.004,0);oP.add(drw);const tray=B(.1,.012,.18,M(0xa87444));tray.position.set(-.255,-.012,0);oP.add(tray);const dh=B(.01,.008,.06,copper);dh.position.set(-.322,-.004,0);oP.add(dh);
+const aLea=new THREE.Object3D();aLea.position.set(-.15,.036,-.28);oP.add(aLea);
+const ak=[-1,1].map(s=>{const k=CY(.022,.02,copper,24);k.rotation.x=Math.PI/2;k.position.set(0,-.002,s*.38);oP.add(k);return k;});
+
+oP.add(tube([V(-.125,-.003,.38),V(-.125,.03,.4),V(-.12,.042,.33),V(-.11,.044,.22),V(-.1,.045,.165)],.006,0xffffff));
+oP.add(tube([V(-.09,-.003,.38),V(-.09,.03,.4),V(-.06,.042,.36),V(.2,.042,.3),V(.22,.042,.1),V(.2,.042,-.15),V(.2,.09,-.27)],.006,0xffffff));
+// typical: curved plain top, narrow cup hole, phone on far side, cable crossing the table
+const sh2=new THREE.Shape();sh2.moveTo(-.25,-.37);sh2.lineTo(.25,-.37);sh2.lineTo(.25,.37);sh2.lineTo(-.25,.37);sh2.lineTo(-.25,.22);sh2.quadraticCurveTo(-.05,0,-.25,-.22);sh2.lineTo(-.25,-.37);
+const plainTop=new THREE.Mesh(new THREE.ExtrudeGeometry(sh2,{depth:.03,bevelEnabled:false}),M(0x3d4247));plainTop.rotation.x=-Math.PI/2;plainTop.position.y=-.005;tP.add(plainTop);
+const hole=CY(.024,.004,black,20);hole.position.set(.16,.027,.28);tP.add(hole);
+const flat=B(.07,.008,.14,M(0x222222));flat.position.set(.2,.029,-.25);tP.add(flat);
+const mark=new THREE.Object3D();mark.position.set(0,.03,-.22);tP.add(mark);
+const board=B(.22,.03,.07,M(0xf5f5f5));board.position.set(-.45,.015,.5);scene.add(board);
+[-.07,0,.07].forEach(x=>{const p=B(.03,.004,.04,M(0x222222));p.position.set(x,.016,0);board.add(p);});
+const m0=wig([V(-1.04,.008,.5),V(-.85,.008,.54),V(-.7,.008,.47),V(-.57,.012,.5)],20,.03);
+const messy0=tube([V(-1.05,.35,.5),V(-1.045,.2,.5),...m0],.006,0xf4f4f4);scene.add(messy0);
+const msec=wig([V(-.34,.02,.52),V(-.1,.008,.5),V(.1,.008,.46),V(.28,.008,.45)],34,.04);
+const mfl=wig([V(.28,.308,.3),V(.3,.308,.1),V(.26,.308,-.1),V(.28,.308,-.19)],24,.03);
+const messy=tube([...msec,V(.28,.12,.42),V(.28,.27,.395),V(.28,.31,.36),...mfl],.006,0xf4f4f4);scene.add(messy);
+const m2a=wig([V(-.34,.02,.48),V(-.1,.008,.4),V(.1,.008,.4),V(.18,.008,.41)],30,.04);
+const m2b=wig([V(.18,.308,.33),V(.15,.308,.24),V(.1,.308,.18)],12,.02);
+const messy2=tube([...m2a,V(.18,.12,.4),V(.18,.27,.385),V(.18,.31,.35),...m2b,V(.09,.309,.162)],.006,0xcfcfcf);scene.add(messy2);
+let wall=tube([V(0,0,0),V(0,.1,0),V(0,.2,.1)],.006,0xf4f4f4);scene.add(wall);
+const tv=V(0,0,0);
+function rebuildWall(){scene.updateMatrixWorld(true);ports[3].getWorldPosition(tv);const h=tv.clone();
+ const pts=[V(-1.03,.35,.5),V(-.85,.2,.62),V(-.5,.03,.6),V(h.x-.2,.03,.6),V(h.x-.05,.05,.5),V(h.x,h.y-.04,.42),V(h.x,h.y,.385)];
+ wall.geometry.dispose();wall.geometry=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,.006,6,false);}
+
+// labels
+const feats=[['Leather sheet',aLea,'o'],['USB ports',usb,'o'],['Cup stand',cup,'o'],['Mobile stand',ph,'o'],['Drawer',drw,'o'],['Height knob',hk[1][0],'o'],['Angle knob',ak[1],'o'],['T-shaped legs',oT.foot,'o'],
+ ['Narrow cup hole',hole,'t'],['Fixed folding legs',tT.leg,'t'],['Cable crosses the table',flat,'t'],['Plain top, no extras',mark,'t']];
+let showL=false,ours=false;
+const vis=o=>{while(o){if(!o.visible)return false;o=o.parent;}return true;};
+const legend=document.getElementById('legend');
+const badges=feats.map(()=>{const d=document.createElement('div');d.className='bd';box.appendChild(d);return d;});
+function refreshLegend(){const m=ours?'o':'t';let k=0;legend.innerHTML='';feats.forEach((f,i)=>{if(f[2]===m){k++;f.n=k;badges[i].textContent=k;const r=document.createElement('div');r.className='li';r.innerHTML='<span class="n">'+k+'</span>'+f[0];legend.appendChild(r);}else f.n=0;});legend.style.display=showL?'block':'none';}
+const tgb=document.getElementById('tg');
+tgb.onclick=()=>{showL=!showL;tgb.classList.toggle('on',showL);tgb.textContent=showL?'Hide features':'Show features';refreshLegend();};
+
+// controls
+const sH=document.getElementById('sH'),sT=document.getElementById('sT'),cap=document.getElementById('cap');
+const cur={H:.30,t:0};let lh=-1,lt=-1;
+const bBad=document.getElementById('bBad'),bOur=document.getElementById('bOur');
+function mode(o){ours=o;bBad.classList.toggle('on',!o);bOur.classList.toggle('on',o);
+ sH.disabled=sT.disabled=!o;sH.value=30;sT.value=0;
+ oT.visible=oP.visible=wall.visible=o;tT.visible=tP.visible=messy.visible=messy2.visible=messy0.visible=board.visible=!o;
+ body.visible=o;cols.forEach(c=>c.visible=o);lapB.position.y=o?.039:.031;scr.position.y=o?.14:.132;
+ cap.textContent=o?'Plug into the table’s USB hub: phone and laptop charge with short, tidy cables.':'No USB ports. One plug needs an extension board, and the cables have to cross the whole table.';
+ document.getElementById('hint').textContent=o?'Now try the sliders and watch the comfort level':'A typical fixed table: low, flat, U-shaped legs. Notice the strain.';
+ lh=-1;refreshLegend();}
+bBad.onclick=()=>mode(false);bOur.onclick=()=>mode(true);mode(false);
+
+const chip=(id,bad)=>document.getElementById(id).classList.toggle('bad',bad);
+function update(){
+ cur.H+=(sH.value/100-cur.H)*.12;cur.t+=(+sT.value-cur.t)*.12;
+ const H=cur.H,tilt=cur.t;
+ document.getElementById('vH').textContent=Math.round(H*100)+' cm';
+ document.getElementById('vT').textContent=Math.round(tilt)+'°';
+ cols.forEach(c=>{c.scale.y=H-.05;c.position.y=(H-.05)/2+.02;});
+ hk.forEach(([k,s])=>{k.position.set(0,(H-.05)*.45+.02,s*.3+s*.03);});
+ tp.position.y=H-.025;tp.rotation.z=THREE.MathUtils.degToRad(tilt);
+ if(ours&&(Math.abs(H-lh)>.002||Math.abs(tilt-lt)>.05)){lh=H;lt=tilt;rebuildWall();}
+ const neckS=clamp(tilt/25),legS=clamp((H-.30)/.12);
+ const flex=40*(1-neckS);
+ const a=THREE.MathUtils.degToRad(55+.4*flex),n=THREE.MathUtils.degToRad(100-1.5*flex);
+ const sh=hipP.clone().add(V(-Math.cos(a)*.55,Math.sin(a)*.55,0));
+ const nt=sh.clone().add(V(Math.cos(n)*.14,Math.sin(n)*.14,0));
+ const hc=nt.clone().add(V(Math.cos(n)*.1,Math.sin(n)*.1,0));
+ seg(torso,hipP,sh);seg(neck,sh,nt);hd.position.copy(hc);
+ eye.position.copy(hc).add(V(.085*Math.sin(n),-.085*Math.cos(n),.04));
+ [-1,1].forEach((s,i)=>{
+  const shd=V(sh.x,sh.y-.02,s*.17),hand=V(T.position.x-.03,H+.06,s*.09);
+  const el=shd.clone().add(hand).multiplyScalar(.5).add(V(-.02,-.12,s*.07));
+  seg(uarm[i],shd,el);seg(farm[i],el,hand);});
+ const stress=1-legS;pants.emissive.setRGB(stress*.55,0,0);
+ const pul=.5+.5*Math.sin(performance.now()/300);
+ pNeck.position.copy(nt);pNeck.material.opacity=(1-neckS)*(.45+.3*pul);
+ pBack.position.copy(hipP).lerp(sh,.3).add(V(-.05,0,0));pBack.material.opacity=(1-neckS)*(.4+.3*pul);
+ pKnee.position.set(knee.x,knee.y+.05,0);pKnee.material.opacity=stress*(.45+.3*pul);pKnee.scale.setScalar(1.6);
+ const pct=Math.round(100*(.5*neckS+.5*legS));
+ document.getElementById('pct').textContent=pct+'%';
+ const f=document.getElementById('fill');f.style.width=pct+'%';f.style.background=pct>70?'var(--good)':pct>40?'#e0a030':'var(--bad)';
+ chip('cNeck',neckS<.6);chip('cBack',neckS<.6);chip('cLegs',legS<.6);
+ document.getElementById('cNeck').textContent=neckS<.6?'Neck strain':'Neck relaxed';
+ document.getElementById('cBack').textContent=neckS<.6?'Back strain':'Back relaxed';
+ document.getElementById('cLegs').textContent=legS<.6?'Legs cramped':'Legs free';
+}
+function fit(){const w=box.clientWidth,h=box.clientHeight;ren.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix();}
+addEventListener('resize',fit);fit();
+const tmp=V(0,0,0);
+(function loop(){requestAnimationFrame(loop);update();ctl.update();ren.render(scene,cam);
+ feats.forEach((f,i)=>{const bd=badges[i],ok=showL&&f.n&&vis(f[1]);bd.style.display=ok?'flex':'none';if(!ok)return;f[1].getWorldPosition(tmp);tmp.project(cam);bd.style.left=((tmp.x+1)/2*box.clientWidth)+'px';bd.style.top=((1-tmp.y)/2*box.clientHeight)+'px';});
+})();
+})();
+</script>
+</body>
+</html>
